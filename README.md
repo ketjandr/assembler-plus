@@ -1,6 +1,6 @@
-# ARM64 Assembler
+# ARM64 Assembler+
 
-A modular two-pass ARM64 assembler that supports three input formats:
+Assembler+ is a two-pass ARM64 assembler that supports three input formats:
 
 1. **Pre-tokenized** (`--tokenized`, default) — the CS241 scanner output format (`TOKEN_TYPE lexeme`)
 2. **Raw assembly** (`--raw`) — standard ARM64 assembly text
