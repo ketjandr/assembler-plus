@@ -28,6 +28,7 @@ asm [OPTIONS] [FILE]
 | `--tokenized` | Input is pre-tokenized format (default) |
 | `--raw` | Input is raw ARM64 assembly |
 | `--high` | Input is high-level pseudocode |
+| `--dump-ir` | (`--high` only) Print IR to stderr instead of assembling |
 | `--help`, `-h` | Show usage |
 
 If `FILE` is omitted or is `-`, reads from stdin. Binary output goes to stdout; labels are printed to stderr.
@@ -35,6 +36,7 @@ If `FILE` is omitted or is `-`, reads from stdin. Binary output goes to stdout; 
 ```bash
 ./asm --raw program.s > program.bin
 ./asm --high program.hl > program.bin
+./asm --high --dump-ir program.hl        # inspect the IR without assembling
 cat tokens.txt | ./asm > program.bin
 ```
 
@@ -100,7 +102,18 @@ label done
 ret
 ```
 
-This is equivalent to the raw assembly:
+With `--dump-ir`, this produces the following target-independent IR:
+
+```
+loop:
+  CMP_BRANCH x1 == x2, done
+  ADD x1, x1, x3
+  BRANCH loop
+done:
+  RET
+```
+
+Which is then lowered to the equivalent raw assembly:
 
 ```asm
 loop:
@@ -114,11 +127,27 @@ done:
 
 ## Project Structure
 
+The `--high` pipeline follows a classic compiler architecture with an explicit IR lowering pass:
+
+```
+ Source code          IR                  Tokens              Binary
+┌──────────┐    ┌───────────┐    ┌──────────────┐    ┌──────────────┐
+│HighLevel │───▶│ IR        │───▶│ IRCodeGen    │───▶│ Assembler    │
+│Parser    │    │ (target-  │    │ (instruction │    │ (two-pass    │
+│          │    │  indep.)  │    │  selection)  │    │  encode)     │
+└──────────┘    └───────────┘    └──────────────┘    └──────────────┘
+                  --dump-ir
+```
+
+The `--raw` and `--tokenized` pipelines skip the IR and feed tokens directly into the assembler.
+
 ```
 ├── main.cpp           # Entry point — mode selection & I/O
 ├── token.h            # Token struct, TokenType enum, I/O operators
 ├── lexer.h            # TokenizedLexer (CS241 format), RawAsmLexer (raw text)
-├── highlevel.h        # HighLevelParser — pseudocode → Token lowering
+├── ir.h               # IRInstruction — target-independent intermediate representation
+├── highlevel.h        # HighLevelParser — pseudocode → IR
+├── ir_codegen.h       # IRCodeGen — IR → ARM64 Token lowering (instruction selection)
 ├── symbol_table.h     # SymbolTable — label definition & lookup
 ├── encoder.h          # Encoder — instruction validation & machine code encoding
 ├── assembler.h        # Assembler — two-pass orchestration
@@ -130,7 +159,9 @@ done:
 |--------|---------------|
 | **Token** | Data types shared across all stages |
 | **Lexer** | Convert input text → `Token` stream (two strategies) |
-| **HighLevelParser** | Convert pseudocode → `Token` stream |
+| **IR** | Target-independent intermediate representation (`IRInstruction`) |
+| **HighLevelParser** | Parse pseudocode → `vector<IRInstruction>` (frontend) |
+| **IRCodeGen** | Lower IR → ARM64 `Token` stream (instruction selection) |
 | **SymbolTable** | Track label → address mappings |
 | **Encoder** | Validate operands and emit 32-bit machine code per instruction |
 | **Assembler** | Group tokens into lines, run pass 1 (symbols) and pass 2 (encode + emit) |

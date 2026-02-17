@@ -1,7 +1,7 @@
 CXX      := g++
 CXXFLAGS := -std=c++20 -Wall -Wextra -O2
 
-HEADERS  := token.h lexer.h encoder.h symbol_table.h assembler.h highlevel.h
+HEADERS  := token.h lexer.h encoder.h symbol_table.h assembler.h ir.h highlevel.h ir_codegen.h
 TARGET   := asm
 
 .PHONY: all clean
